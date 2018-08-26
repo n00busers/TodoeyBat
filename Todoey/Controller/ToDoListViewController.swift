@@ -7,35 +7,27 @@
 //
 
 import UIKit
+import CoreData
 
-class ToDoListViewController: UITableViewController {
+class ToDoListViewController: UITableViewController{
 
-    var itemArray = [Item]()
-//    var itemArray = ["Hello" , "Wassup" , "Morning"]
+    //MARK - Create Items
+     let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
-    let defaults = UserDefaults.standard
+    var itemArray = [Item]()
+    
+    var selectedCategory : Category? {
+        didSet{
+            loadItems()
+        }
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        let newItem = Item()
-        newItem.title = "Find Me"
-        itemArray.append(newItem)
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
         
-        let newItem2 = Item()
-        newItem2.title = "Find Me"
-        itemArray.append(newItem2)
-        
-        let newItem3 = Item()
-        newItem3.title = "Find Me"
-        itemArray.append(newItem3)
-        
-        if let items = UserDefaults.standard.array(forKey: "TodoListArray") as? [Item] {
-            itemArray = items
-        }
     }
-
-    
     
     //MARK - Tableview Datasource Methods
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -70,9 +62,14 @@ class ToDoListViewController: UITableViewController {
         
         itemArray[indexPath.row].done = !itemArray[indexPath.row].done
         
-        tableView.reloadData()
+        saveItems()
         
         tableView.deselectRow(at: indexPath, animated: true)
+        
+        // delete selected item from table
+        
+//        context.delete(itemArray[indexPath.row])  // first delete from database
+//        itemArray.remove(at: indexPath.row)        // second delete from table
     }
     
     //MARK - Add new Items
@@ -83,14 +80,18 @@ class ToDoListViewController: UITableViewController {
         let alert = UIAlertController(title: "Add New Todoey Item", message: "", preferredStyle: .alert)
         
         let action = UIAlertAction(title: "Add Item", style: .default){ (action) in
+            
             // what will happen once the user clicks the Add Item button on our UIAlert
             print(textField.text!)
-            let newItem = Item()
-            newItem.title = textField.text!
+           
             
+            let newItem = Item(context: self.context)
+            newItem.title = textField.text!
+            newItem.done = false
+            newItem.parentCategory = self.selectedCategory
             self.itemArray.append(newItem)
-            self.defaults.set(self.itemArray, forKey: "TodoListArray")
-            self.tableView.reloadData()
+            self.saveItems()
+            
         }
         
         alert.addTextField { (alertTextField) in
@@ -102,6 +103,59 @@ class ToDoListViewController: UITableViewController {
         present(alert, animated:  true, completion: nil)
     }
     
+    //MARK - Model Manupulation Method
+    //Save function
+    func saveItems() {
+
+        do {
+           try context.save()
+        } catch{
+           print("Error saving context \(context)")
+        }
+        self.tableView.reloadData()
+    }
     
+    //Load function
+    func loadItems(with request : NSFetchRequest<Item> = Item.fetchRequest(), predicate : NSPredicate? = nil) {
+        let Categorypredicate = NSPredicate(format: "parentCategory.name MATCHES %@", selectedCategory!.name!)
+       
+        if let addtionalPredicate = predicate {
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [Categorypredicate, addtionalPredicate])
+        }else{
+            request.predicate = Categorypredicate
+        }
+            do {
+                itemArray = try context.fetch(request)
+            } catch {
+               print("Error fetching data from context \(error)")
+            }
+        tableView.reloadData()
+        }
 }
+
+ //MARK - SearchBar
+extension ToDoListViewController : UISearchBarDelegate {
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        let request : NSFetchRequest<Item> = Item.fetchRequest()
+        
+        let predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+        
+         request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        
+        loadItems(with: request, predicate: predicate)
+    }
+    
+    //MARK - clear or press X to show default table.
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0 {
+            loadItems()
+            
+            //hide keyboard after clean word from searchbar
+            DispatchQueue.main.async {
+                searchBar.resignFirstResponder()
+            }
+        }
+    }
+}
+
 
