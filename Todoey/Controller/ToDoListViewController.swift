@@ -92,6 +92,8 @@ class ToDoListViewController: UITableViewController{
             self.itemArray.append(newItem)
             self.saveItems()
             
+            
+            
         }
         
         alert.addTextField { (alertTextField) in
