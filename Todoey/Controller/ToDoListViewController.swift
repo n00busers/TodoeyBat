@@ -95,7 +95,7 @@ class ToDoListViewController: UITableViewController{
         }
         
         alert.addTextField { (alertTextField) in
-            alertTextField.placeholder = "Create new Item"
+            alertTextField.placeholder = "Create new Items in the list"
             textField = alertTextField
             
         }
